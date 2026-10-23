@@ -45,45 +45,4 @@ public class FlowExecutorConstants {
 
         }
     }
-
-    /**
-     * Error messages of the flow executors.
-     */
-    public enum ErrorMessages {
-
-        // Flow handoff errors.
-        ERROR_CODE_INVALID_HANDOFF("60301",
-                "Invalid flow handoff.",
-                "The flow handoff is invalid."),
-        ERROR_CODE_HANDOFF_EXPIRED("60302",
-                "Flow handoff expired.",
-                "The flow handoff link has expired.");
-
-        private static final String ERROR_PREFIX = "FEX";
-        private final String code;
-        private final String message;
-        private final String description;
-
-        ErrorMessages(String code, String message, String description) {
-
-            this.code = ERROR_PREFIX + "-" + code;
-            this.message = message;
-            this.description = description;
-        }
-
-        public String getCode() {
-
-            return code;
-        }
-
-        public String getMessage() {
-
-            return message;
-        }
-
-        public String getDescription() {
-
-            return description;
-        }
-    }
 }

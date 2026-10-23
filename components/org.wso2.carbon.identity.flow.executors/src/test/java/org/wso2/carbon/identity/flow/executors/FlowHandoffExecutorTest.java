@@ -23,7 +23,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
-import org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.ErrorMessages;
 import org.wso2.carbon.identity.flow.mgt.model.ExecutorDTO;
 import org.wso2.carbon.identity.flow.mgt.model.NodeConfig;
 
@@ -40,8 +39,6 @@ import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorS
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.OTFI;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.REDIRECT_URL;
-import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.ErrorMessages.ERROR_CODE_HANDOFF_EXPIRED;
-import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.ErrorMessages.ERROR_CODE_INVALID_HANDOFF;
 import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.FlowHandoff.EXPIRY_TIME_METADATA_KEY;
 import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.FlowHandoff.FLOW_HANDOFF_CREATED_TIMESTAMP;
 import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.FlowHandoff.FLOW_HANDOFF_EXECUTOR;
@@ -56,6 +53,8 @@ public class FlowHandoffExecutorTest {
     private static final String PORTAL_URL = "https://localhost:9443/accounts/execution-flow.jsp";
     private static final String STEP_TARGET_URL = "https://app.example.com/continue";
     private static final String FLOW_ID = "test-flow-id";
+    private static final String INVALID_HANDOFF_MESSAGE = "The flow handoff is invalid.";
+    private static final String HANDOFF_EXPIRED_MESSAGE = "The flow handoff link has expired.";
 
     private FlowHandoffExecutor executor;
     private FlowExecutionContext context;
@@ -187,7 +186,7 @@ public class FlowHandoffExecutorTest {
         assertEquals(executor.execute(context).getResult(), STATUS_COMPLETE);
 
         setCreatedTimestamp(System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(expectedSeconds) - 1000);
-        assertUserErrorAndCreatedTimestampRemoved(executor.execute(context), ERROR_CODE_HANDOFF_EXPIRED);
+        assertUserErrorAndCreatedTimestampRemoved(executor.execute(context), HANDOFF_EXPIRED_MESSAGE);
     }
 
     @Test
@@ -195,14 +194,14 @@ public class FlowHandoffExecutorTest {
 
         context.setProperty(FLOW_HANDOFF_CREATED_TIMESTAMP, "invalid");
 
-        assertUserErrorAndCreatedTimestampRemoved(executor.execute(context), ERROR_CODE_INVALID_HANDOFF);
+        assertUserErrorAndCreatedTimestampRemoved(executor.execute(context), INVALID_HANDOFF_MESSAGE);
     }
 
     @Test
     public void testResumeIsSingleUse() {
 
         setCreatedTimestamp(System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(5));
-        assertUserErrorAndCreatedTimestampRemoved(executor.execute(context), ERROR_CODE_HANDOFF_EXPIRED);
+        assertUserErrorAndCreatedTimestampRemoved(executor.execute(context), HANDOFF_EXPIRED_MESSAGE);
 
         // With the created timestamp removed, the next call issues a new link instead of resuming.
         assertEquals(executor.execute(context).getResult(), STATUS_EXTERNAL_REDIRECTION);
@@ -236,12 +235,11 @@ public class FlowHandoffExecutorTest {
         context.setProperty(FLOW_HANDOFF_CREATED_TIMESTAMP, String.valueOf(createdTimestamp));
     }
 
-    private void assertUserErrorAndCreatedTimestampRemoved(ExecutorResponse response, ErrorMessages error) {
+    private void assertUserErrorAndCreatedTimestampRemoved(ExecutorResponse response, String errorMessage) {
 
         assertEquals(response.getResult(), STATUS_USER_ERROR);
-        assertEquals(response.getErrorCode(), error.getCode());
-        assertEquals(response.getErrorMessage(), error.getMessage());
-        assertEquals(response.getErrorDescription(), error.getDescription());
+        assertNull(response.getErrorCode());
+        assertEquals(response.getErrorMessage(), errorMessage);
         assertFalse(context.getProperties().containsKey(FLOW_HANDOFF_CREATED_TIMESTAMP));
     }
 }

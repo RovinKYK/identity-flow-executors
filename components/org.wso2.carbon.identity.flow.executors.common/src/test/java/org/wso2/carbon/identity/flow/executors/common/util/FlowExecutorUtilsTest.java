@@ -19,7 +19,6 @@
 package org.wso2.carbon.identity.flow.executors.common.util;
 
 import org.testng.annotations.Test;
-import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineClientException;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 import org.wso2.carbon.identity.flow.mgt.model.ExecutorDTO;
@@ -63,13 +62,10 @@ public class FlowExecutorUtilsTest {
     @Test
     public void testUserErrorResponse() {
 
-        ExecutorResponse response = FlowExecutorUtils.userErrorResponse(new ExecutorResponse(), "TST-60001",
-                "Message.", "Description.");
+        ExecutorResponse response = FlowExecutorUtils.userErrorResponse(new ExecutorResponse(), "Message.");
 
         assertEquals(response.getResult(), STATUS_USER_ERROR);
-        assertEquals(response.getErrorCode(), "TST-60001");
         assertEquals(response.getErrorMessage(), "Message.");
-        assertEquals(response.getErrorDescription(), "Description.");
     }
 
     @Test
@@ -88,26 +84,6 @@ public class FlowExecutorUtilsTest {
 
         assertEquals(response.getResult(), STATUS_CLIENT_INPUT_REQUIRED);
         assertEquals(response.getRequiredData(), Arrays.asList("a", "b"));
-    }
-
-    @Test
-    public void testHandleClientException() {
-
-        FlowEngineClientException exception = FlowExecutorUtils.handleClientException("TST-60001", "Message.",
-                "Description: %s.", "data");
-
-        assertEquals(exception.getErrorCode(), "TST-60001");
-        assertEquals(exception.getMessage(), "Message.");
-        assertEquals(exception.getDescription(), "Description: data.");
-    }
-
-    @Test
-    public void testHandleClientExceptionWithoutData() {
-
-        FlowEngineClientException exception = FlowExecutorUtils.handleClientException("TST-60001", "Message.",
-                "Description: %s.");
-
-        assertEquals(exception.getDescription(), "Description: %s.");
     }
 
     private FlowExecutionContext buildContext(ExecutorDTO executorDTO) {

@@ -46,7 +46,7 @@ public class FlowExecutorServiceComponent {
             bundleContext.registerService(Executor.class.getName(), new FlowHandoffExecutor(), null);
             LOG.debug("Flow executor service successfully activated.");
         } catch (Throwable e) {
-            LOG.error("Error while initiating flow executor service", e);
+            LOG.error("Error while initiating flow executor service.", e);
         }
     }
 

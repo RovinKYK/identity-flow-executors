@@ -18,8 +18,6 @@
 
 package org.wso2.carbon.identity.flow.executors.common.util;
 
-import org.apache.commons.lang.ArrayUtils;
-import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineClientException;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 import org.wso2.carbon.identity.flow.mgt.model.ExecutorDTO;
@@ -66,21 +64,16 @@ public final class FlowExecutorUtils {
     }
 
     /**
-     * Set the user error status, code, message and description on the executor response.
+     * Set the user error status and message on the executor response.
      *
-     * @param response    Executor response.
-     * @param errorCode   Error code.
-     * @param message     Error message.
-     * @param description Error description.
+     * @param response     Executor response.
+     * @param errorMessage Error message.
      * @return Executor response.
      */
-    public static ExecutorResponse userErrorResponse(ExecutorResponse response, String errorCode, String message,
-                                                     String description) {
+    public static ExecutorResponse userErrorResponse(ExecutorResponse response, String errorMessage) {
 
         response.setResult(STATUS_USER_ERROR);
-        response.setErrorCode(errorCode);
-        response.setErrorMessage(message);
-        response.setErrorDescription(description);
+        response.setErrorMessage(errorMessage);
         return response;
     }
 
@@ -110,23 +103,5 @@ public final class FlowExecutorUtils {
         response.setResult(STATUS_CLIENT_INPUT_REQUIRED);
         response.setRequiredData(Arrays.asList(fields));
         return response;
-    }
-
-    /**
-     * Build a flow engine client exception, formatting the description with the data.
-     *
-     * @param errorCode   Error code.
-     * @param message     Error message.
-     * @param description Error description.
-     * @param data        The error description data.
-     * @return FlowEngineClientException.
-     */
-    public static FlowEngineClientException handleClientException(String errorCode, String message,
-                                                                  String description, Object... data) {
-
-        if (ArrayUtils.isNotEmpty(data)) {
-            description = String.format(description, data);
-        }
-        return new FlowEngineClientException(errorCode, message, description);
     }
 }

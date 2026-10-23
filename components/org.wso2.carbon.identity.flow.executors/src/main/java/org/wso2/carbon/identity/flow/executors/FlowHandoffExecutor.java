@@ -24,8 +24,6 @@ import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.flow.execution.engine.graph.Executor;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
-import org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils;
-import org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.ErrorMessages;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,6 +37,7 @@ import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorS
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.OTFI;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.REDIRECT_URL;
 import static org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils.getMetadataValue;
+import static org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils.userErrorResponse;
 import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.FLOW_ID;
 import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.FlowHandoff.DEFAULT_HANDOFF_EXPIRY_SECONDS;
 import static org.wso2.carbon.identity.flow.executors.constant.FlowExecutorConstants.FlowHandoff.EXPIRY_TIME_METADATA_KEY;
@@ -131,12 +130,12 @@ public class FlowHandoffExecutor implements Executor {
         try {
             createdTimestamp = Long.parseLong(String.valueOf(createdTimestampValue));
         } catch (NumberFormatException e) {
-            LOG.debug("Invalid flow handoff created timestamp.");
-            return userErrorResponse(response, ErrorMessages.ERROR_CODE_INVALID_HANDOFF);
+            LOG.debug("Invalid flow handoff created timestamp.", e);
+            return userErrorResponse(response, "The flow handoff is invalid.");
         }
         if (System.currentTimeMillis() - createdTimestamp >= TimeUnit.SECONDS.toMillis(getExpiryTime(context))) {
             LOG.debug("Flow handoff link has expired.");
-            return userErrorResponse(response, ErrorMessages.ERROR_CODE_HANDOFF_EXPIRED);
+            return userErrorResponse(response, "The flow handoff link has expired.");
         }
 
         response.setResult(STATUS_COMPLETE);
@@ -170,11 +169,5 @@ public class FlowHandoffExecutor implements Executor {
             }
         }
         return DEFAULT_HANDOFF_EXPIRY_SECONDS;
-    }
-
-    private ExecutorResponse userErrorResponse(ExecutorResponse response, ErrorMessages error) {
-
-        return FlowExecutorUtils.userErrorResponse(response, error.getCode(), error.getMessage(),
-                error.getDescription());
     }
 }
