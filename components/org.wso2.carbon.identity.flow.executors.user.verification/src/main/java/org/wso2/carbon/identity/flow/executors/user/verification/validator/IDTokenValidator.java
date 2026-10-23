@@ -31,8 +31,6 @@ import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineClientException;
 import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineServerException;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
-import org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils;
-import org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages;
 import org.wso2.carbon.identity.flow.executors.user.verification.internal.UserVerificationDataHolder;
 import org.wso2.carbon.identity.oauth.common.OAuthConstants;
 import org.wso2.carbon.identity.oauth.common.exception.InvalidOAuthClientException;
@@ -54,6 +52,10 @@ import java.util.Date;
 import java.util.List;
 
 import static org.wso2.carbon.identity.core.util.IdentityCoreConstants.TENANT_NAME_FROM_CONTEXT;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ErrorMessages.ERROR_CODE_EXECUTOR_FAILURE;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ErrorMessages.ERROR_CODE_FLOW_FAILURE;
+import static org.wso2.carbon.identity.flow.execution.engine.util.FlowExecutionEngineUtils.handleClientException;
+import static org.wso2.carbon.identity.flow.execution.engine.util.FlowExecutionEngineUtils.handleServerException;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.TokenTypes.ID_TOKEN_TYPE;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.USER_VERIFICATION_AUDIENCE;
 
@@ -91,17 +93,20 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
             validateTimestamps(claimsSet, tokenValidityPeriod);
             AuthenticatedUser user = resolveUser(claimsSet.getSubject(), tenantDomain, appTenantDomain, clientId);
             if (user == null) {
-                LOG.debug("ID token subject could not be resolved to a user in the organization.");
-                throw handleClientException(ErrorMessages.ERROR_CODE_USER_NOT_FOUND, tenantDomain);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Subject of the ID token from client ID: " + clientId
+                            + " could not be resolved to a user in tenant domain: " + tenantDomain);
+                }
+                throw handleClientException(ERROR_CODE_FLOW_FAILURE, "The user could not be resolved.");
             }
             return user;
         } catch (IDTokenValidationFailureException e) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("ID token validation failed: " + e.getMessage());
             }
-            throw handleClientException(ErrorMessages.ERROR_CODE_INVALID_TOKEN);
+            throw handleClientException(ERROR_CODE_FLOW_FAILURE, "The token is invalid.");
         } catch (IdentityOAuth2Exception e) {
-            throw new FlowEngineServerException(null, "Error while validating the ID token.", null, e);
+            throw handleServerException(ERROR_CODE_EXECUTOR_FAILURE, e, "Error while validating the ID token.");
         }
     }
 
@@ -111,6 +116,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
             IdentityUtil.validateJWTDepth(idToken);
             return SignedJWT.parse(idToken);
         } catch (ParseException e) {
+            LOG.debug("ID token could not be parsed.", e);
             throw new IDTokenValidationFailureException("ID token could not be parsed.");
         }
     }
@@ -120,6 +126,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
         try {
             return signedJWT.getJWTClaimsSet();
         } catch (ParseException e) {
+            LOG.debug("ID token claims could not be parsed.", e);
             throw new IDTokenValidationFailureException("ID token claims could not be parsed.");
         }
     }
@@ -129,6 +136,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
         try {
             JWTUtils.validateMandatoryClaims(claimsSet);
         } catch (IdentityOAuth2Exception e) {
+            LOG.debug("ID token mandatory claims validation failed.", e);
             throw new IDTokenValidationFailureException(e.getMessage());
         }
     }
@@ -153,6 +161,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
                     .resolveOrganizationId(tenantDomain);
             oAuthAppDO = OAuth2Util.getAppInformationFromOrgHierarchy(clientId, orgId);
         } catch (InvalidOAuthClientException e) {
+            LOG.debug("No OAuth application found for the ID token client ID.", e);
             throw new IDTokenValidationFailureException("No OAuth application found for the ID token client ID.");
         } catch (OrganizationManagementException e) {
             throw new IdentityOAuth2Exception("Error while resolving the organization of the tenant: "
@@ -180,6 +189,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
                 throw new IDTokenValidationFailureException("ID token signature validation failed.");
             }
         } catch (JOSEException e) {
+            LOG.debug("ID token signature could not be validated.", e);
             throw new IDTokenValidationFailureException("ID token signature could not be validated.");
         }
     }
@@ -196,7 +206,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
         }
         if (!audience.contains(USER_VERIFICATION_AUDIENCE)) {
             LOG.debug("ID token audience does not contain the user verification audience.");
-            throw handleClientException(ErrorMessages.ERROR_CODE_INVALID_TOKEN_AUDIENCE);
+            throw handleClientException(ERROR_CODE_FLOW_FAILURE, "Invalid audience values provided.");
         }
     }
 
@@ -290,11 +300,12 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
             throws IDTokenValidationFailureException, FlowEngineClientException {
 
         if (!JWTUtils.checkExpirationTime(claimsSet.getExpirationTime())) {
-            throw handleClientException(ErrorMessages.ERROR_CODE_TOKEN_EXPIRED);
+            throw handleClientException(ERROR_CODE_FLOW_FAILURE, "The token is expired.");
         }
         try {
             JWTUtils.checkNotBeforeTime(claimsSet.getNotBeforeTime());
         } catch (IdentityOAuth2Exception e) {
+            LOG.debug("ID token is not valid yet.", e);
             throw new IDTokenValidationFailureException(e.getMessage());
         }
         Date issueTime = claimsSet.getIssueTime();
@@ -305,7 +316,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
         long skewMillis = OAuthServerConfiguration.getInstance().getTimeStampSkewInSeconds() * 1000;
         if (now + skewMillis - issueTime.getTime() > tokenValidityPeriod * 1000) {
             LOG.debug("ID token is older than the token validity period.");
-            throw handleClientException(ErrorMessages.ERROR_CODE_TOKEN_ISSUED_BEFORE_ALLOWED_TIME);
+            throw handleClientException(ERROR_CODE_FLOW_FAILURE, "The token is issued before the allowed time.");
         }
     }
 
@@ -337,7 +348,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
             }
         } catch (IdentityOAuth2Exception e) {
             LOG.debug("Could not resolve the user by the application's subject claim. Retrying with the default "
-                    + "subject.");
+                    + "subject.", e);
         }
         if (user == null) {
             try {
@@ -347,7 +358,7 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
                     user = OAuth2Util.getAuthenticatedUser(subject, tenantDomain, clientId);
                 }
             } catch (IdentityOAuth2Exception e) {
-                LOG.debug("Could not resolve the user by the default subject.");
+                LOG.debug("Could not resolve the user by the default subject.", e);
                 return null;
             }
         }
@@ -356,11 +367,5 @@ public class IDTokenValidator implements UserVerificationTokenValidator {
             return null;
         }
         return user;
-    }
-
-    private static FlowEngineClientException handleClientException(ErrorMessages error, Object... data) {
-
-        return FlowExecutorUtils.handleClientException(error.getCode(), error.getMessage(), error.getDescription(),
-                data);
     }
 }

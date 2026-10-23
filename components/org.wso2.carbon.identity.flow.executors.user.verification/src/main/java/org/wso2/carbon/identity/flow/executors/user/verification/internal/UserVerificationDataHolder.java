@@ -25,7 +25,7 @@ import org.wso2.carbon.identity.organization.management.service.OrganizationMana
 import org.wso2.carbon.user.core.service.RealmService;
 
 /**
- * Holds the OSGi services used by the user verification executors.
+ * Holds the OSGi services used by the user verification executor.
  */
 public class UserVerificationDataHolder {
 

@@ -29,7 +29,7 @@
     <artifactId>org.wso2.carbon.identity.flow.executors.user.verification</artifactId>
     <packaging>bundle</packaging>
     <name>Flow Executors - User Verification</name>
-    <description>Flow executors that resolve the user from an OIDC ID token</description>
+    <description>Flow executor that verifies the user from a token</description>
     <url>http://wso2.org</url>
 
     <dependencies>

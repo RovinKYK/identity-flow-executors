@@ -36,7 +36,7 @@ import org.wso2.carbon.identity.organization.management.service.OrganizationMana
 import org.wso2.carbon.user.core.service.RealmService;
 
 /**
- * OSGi declarative services component which registers the user verification executors.
+ * OSGi declarative services component which registers the user verification executor.
  */
 @Component(
         name = "identity.flow.executors.user.verification.component",
@@ -53,7 +53,7 @@ public class UserVerificationServiceComponent {
                     null);
             LOG.debug("User verification executor service successfully activated.");
         } catch (Throwable e) {
-            LOG.error("Error while initiating user verification executor service", e);
+            LOG.error("Error while initiating user verification executor service.", e);
         }
     }
 

@@ -38,8 +38,6 @@ import org.wso2.carbon.identity.flow.execution.engine.graph.Executor;
 import org.wso2.carbon.identity.flow.execution.engine.model.ExecutorResponse;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowUser;
-import org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils;
-import org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages;
 import org.wso2.carbon.identity.flow.executors.user.verification.internal.UserVerificationDataHolder;
 import org.wso2.carbon.identity.flow.executors.user.verification.validator.IDTokenValidator;
 import org.wso2.carbon.identity.flow.executors.user.verification.validator.UserVerificationTokenValidator;
@@ -57,9 +55,12 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants.ResidentIdpPropertyName.ACCOUNT_DISABLE_HANDLER_ENABLE_PROPERTY;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ErrorMessages.ERROR_CODE_EXECUTOR_FAILURE;
+import static org.wso2.carbon.identity.flow.execution.engine.util.FlowExecutionEngineUtils.handleServerException;
 import static org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils.clientInputRequiredResponse;
 import static org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils.getMetadataValue;
 import static org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils.serverErrorResponse;
+import static org.wso2.carbon.identity.flow.executors.common.util.FlowExecutorUtils.userErrorResponse;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.DEFAULT_TOKEN_VALIDITY_PERIOD_MINUTES;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.TOKEN;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.TOKEN_TYPE;
@@ -114,7 +115,7 @@ public class UserVerificationExecutor implements Executor {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("User verification failed: unsupported token type: " + tokenType);
             }
-            return userErrorResponse(response, ErrorMessages.ERROR_CODE_UNSUPPORTED_TOKEN_TYPE);
+            return userErrorResponse(response, "The token type is not supported.");
         }
 
         try {
@@ -122,18 +123,17 @@ public class UserVerificationExecutor implements Executor {
             AuthenticatedUser user = tokenValidator.validateAndGetUser(token, context, getTokenValidityPeriod(context));
             if (isAccountLocked(user, tenantDomain)) {
                 LOG.debug("User verification failed: the user account is locked.");
-                return userErrorResponse(response, ErrorMessages.ERROR_CODE_ACCOUNT_LOCKED);
+                return userErrorResponse(response, "The user account is locked.");
             }
             if (isAccountDisabled(user, tenantDomain)) {
                 LOG.debug("User verification failed: the user account is disabled.");
-                return userErrorResponse(response, ErrorMessages.ERROR_CODE_ACCOUNT_DISABLED);
+                return userErrorResponse(response, "The user account is disabled.");
             }
             setupFlowUser(context, user, tenantDomain);
             response.setResult(Constants.ExecutorStatus.STATUS_COMPLETE);
             return response;
         } catch (FlowEngineClientException e) {
-            return FlowExecutorUtils.userErrorResponse(response, e.getErrorCode(), e.getMessage(),
-                    e.getDescription());
+            return userErrorResponse(response, e.getDescription());
         } catch (FlowEngineServerException | UserStoreException e) {
             String errorMessage = "Error while verifying the token.";
             LOG.error(errorMessage, e);
@@ -179,8 +179,8 @@ public class UserVerificationExecutor implements Executor {
             return UserVerificationDataHolder.getInstance().getAccountLockService()
                     .isAccountLocked(user.getUserName(), tenantDomain, user.getUserStoreDomain());
         } catch (AccountLockServiceException e) {
-            throw new FlowEngineServerException(null, "Error while checking the account lock status of the user.",
-                    null, e);
+            throw handleServerException(ERROR_CODE_EXECUTOR_FAILURE, e,
+                    "Error while checking the account lock status of the user.");
         }
     }
 
@@ -196,8 +196,8 @@ public class UserVerificationExecutor implements Executor {
             return UserVerificationDataHolder.getInstance().getAccountDisableService()
                     .isAccountDisabled(user.getUserName(), tenantDomain, user.getUserStoreDomain());
         } catch (IllegalArgumentException | AccountDisableServiceException | FrameworkException e) {
-            throw new FlowEngineServerException(null, "Error while checking the account disable status of the user.",
-                    null, e);
+            throw handleServerException(ERROR_CODE_EXECUTOR_FAILURE, e,
+                    "Error while checking the account disable status of the user.");
         }
     }
 
@@ -262,11 +262,5 @@ public class UserVerificationExecutor implements Executor {
             }
         }
         return TimeUnit.MINUTES.toSeconds(DEFAULT_TOKEN_VALIDITY_PERIOD_MINUTES);
-    }
-
-    private ExecutorResponse userErrorResponse(ExecutorResponse response, ErrorMessages error) {
-
-        return FlowExecutorUtils.userErrorResponse(response, error.getCode(), error.getMessage(),
-                error.getDescription());
     }
 }

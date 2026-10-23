@@ -37,7 +37,6 @@ import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineClientException;
 import org.wso2.carbon.identity.flow.execution.engine.exception.FlowEngineServerException;
 import org.wso2.carbon.identity.flow.execution.engine.model.FlowExecutionContext;
-import org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages;
 import org.wso2.carbon.identity.flow.executors.user.verification.internal.UserVerificationDataHolder;
 import org.wso2.carbon.identity.oauth.common.OAuthConstants;
 import org.wso2.carbon.identity.oauth.common.exception.InvalidOAuthClientException;
@@ -65,12 +64,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.expectThrows;
 import static org.wso2.carbon.identity.core.util.IdentityCoreConstants.TENANT_NAME_FROM_CONTEXT;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ErrorMessages.ERROR_CODE_FLOW_FAILURE;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.DEFAULT_TOKEN_VALIDITY_PERIOD_MINUTES;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_INVALID_TOKEN;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_INVALID_TOKEN_AUDIENCE;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_TOKEN_EXPIRED;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_TOKEN_ISSUED_BEFORE_ALLOWED_TIME;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_USER_NOT_FOUND;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.TokenTypes.ID_TOKEN_TYPE;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.USER_VERIFICATION_AUDIENCE;
 
@@ -96,6 +91,7 @@ public class IDTokenValidatorTest {
     private static final String MUTUAL_TLS_ALIASES_ENABLED = "OAuth.MutualTLSAliases.Enabled";
     private static final long TOKEN_VALIDITY_PERIOD_SECONDS =
             TimeUnit.MINUTES.toSeconds(DEFAULT_TOKEN_VALIDITY_PERIOD_MINUTES);
+    private static final String USER_NOT_FOUND_MESSAGE = "The user could not be resolved.";
 
     private KeyPair keyPair;
     private KeyPair otherKeyPair;
@@ -228,21 +224,21 @@ public class IDTokenValidatorTest {
     public void testTokenExpired() throws Exception {
 
         assertClientError(buildToken(builder -> builder.expirationTime(
-                new Date(System.currentTimeMillis() - 600_000))), ERROR_CODE_TOKEN_EXPIRED);
+                new Date(System.currentTimeMillis() - 600_000))), "The token is expired.");
     }
 
     @Test
     public void testTokenIssuedBeforeAllowedTime() throws Exception {
 
         assertClientError(buildToken(builder -> builder.issueTime(new Date(System.currentTimeMillis() - 600_000))),
-                ERROR_CODE_TOKEN_ISSUED_BEFORE_ALLOWED_TIME);
+                "The token is issued before the allowed time.");
     }
 
     @Test
     public void testAudienceWithoutUserVerificationAudience() throws Exception {
 
         assertClientError(buildToken(builder -> builder.audience(Arrays.asList(CLIENT_ID, ISSUER))),
-                ERROR_CODE_INVALID_TOKEN_AUDIENCE);
+                "Invalid audience values provided.");
     }
 
     @Test
@@ -373,8 +369,7 @@ public class IDTokenValidatorTest {
         oAuth2Util.when(() -> OAuth2Util.getAuthenticatedUser(SUBJECT, TENANT_DOMAIN, ORG_ID, ORG_ID, CLIENT_ID))
                 .thenThrow(new IdentityOAuth2Exception("User not found."));
 
-        assertClientError(buildToken(builder -> { }), ERROR_CODE_USER_NOT_FOUND,
-                String.format(ERROR_CODE_USER_NOT_FOUND.getDescription(), ORG_TENANT_DOMAIN));
+        assertClientError(buildToken(builder -> { }), USER_NOT_FOUND_MESSAGE);
     }
 
     @DataProvider(name = "sharedUserData")
@@ -393,8 +388,7 @@ public class IDTokenValidatorTest {
         oAuth2Util.when(() -> OAuth2Util.getAuthenticatedUserFromSubjectIdentifier(SUBJECT, TENANT_DOMAIN,
                 ORG_ID, ORG_ID, CLIENT_ID)).thenReturn(buildOrganizationUser(userResidentOrganizationId));
 
-        assertClientError(buildToken(builder -> { }), ERROR_CODE_USER_NOT_FOUND,
-                String.format(ERROR_CODE_USER_NOT_FOUND.getDescription(), ORG_TENANT_DOMAIN));
+        assertClientError(buildToken(builder -> { }), USER_NOT_FOUND_MESSAGE);
     }
 
     @Test
@@ -405,8 +399,7 @@ public class IDTokenValidatorTest {
         oAuth2Util.when(() -> OAuth2Util.getAuthenticatedUser(SUBJECT, TENANT_DOMAIN, CLIENT_ID))
                 .thenThrow(new IdentityOAuth2Exception("User not found."));
 
-        assertClientError(buildToken(builder -> { }), ERROR_CODE_USER_NOT_FOUND,
-                String.format(ERROR_CODE_USER_NOT_FOUND.getDescription(), TENANT_DOMAIN));
+        assertClientError(buildToken(builder -> { }), USER_NOT_FOUND_MESSAGE);
     }
 
     @Test
@@ -470,20 +463,15 @@ public class IDTokenValidatorTest {
 
     private void assertClientError(String token) {
 
-        assertClientError(token, ERROR_CODE_INVALID_TOKEN);
+        assertClientError(token, "The token is invalid.");
     }
 
-    private void assertClientError(String token, ErrorMessages error) {
-
-        assertClientError(token, error, error.getDescription());
-    }
-
-    private void assertClientError(String token, ErrorMessages error, String description) {
+    private void assertClientError(String token, String description) {
 
         FlowEngineClientException exception = expectThrows(FlowEngineClientException.class,
                 () -> validator.validateAndGetUser(token, context, TOKEN_VALIDITY_PERIOD_SECONDS));
-        assertEquals(exception.getErrorCode(), error.getCode());
-        assertEquals(exception.getMessage(), error.getMessage());
+        assertEquals(exception.getErrorCode(), ERROR_CODE_FLOW_FAILURE.getCode());
+        assertEquals(exception.getMessage(), ERROR_CODE_FLOW_FAILURE.getMessage());
         assertEquals(exception.getDescription(), description);
     }
 

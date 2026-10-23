@@ -64,15 +64,12 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants.ResidentIdpPropertyName.ACCOUNT_DISABLE_HANDLER_ENABLE_PROPERTY;
+import static org.wso2.carbon.identity.flow.execution.engine.Constants.ErrorMessages.ERROR_CODE_FLOW_FAILURE;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_CLIENT_INPUT_REQUIRED;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_COMPLETE;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_ERROR;
 import static org.wso2.carbon.identity.flow.execution.engine.Constants.ExecutorStatus.STATUS_USER_ERROR;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.DEFAULT_TOKEN_VALIDITY_PERIOD_MINUTES;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_ACCOUNT_DISABLED;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_ACCOUNT_LOCKED;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_INVALID_TOKEN;
-import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.ErrorMessages.ERROR_CODE_UNSUPPORTED_TOKEN_TYPE;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.TOKEN;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.TOKEN_TYPE;
 import static org.wso2.carbon.identity.flow.executors.user.verification.constant.UserVerificationConstants.TOKEN_VALIDITY_PERIOD_METADATA_KEY;
@@ -92,6 +89,7 @@ public class UserVerificationExecutorTest {
     private static final String USER_NAME = "john";
     private static final String USER_STORE_DOMAIN = "PRIMARY";
     private static final String EMAIL_CLAIM = "http://wso2.org/claims/emailaddress";
+    private static final String INVALID_TOKEN_MESSAGE = "The token is invalid.";
 
     private UserVerificationTokenValidator tokenValidator;
     private UserVerificationExecutor executor;
@@ -207,8 +205,7 @@ public class UserVerificationExecutorTest {
         context.addUserInputData(TOKEN, TOKEN_VALUE);
         context.addUserInputData(TOKEN_TYPE, "urn:ietf:params:oauth:token-type:access_token");
 
-        assertUserError(ERROR_CODE_UNSUPPORTED_TOKEN_TYPE.getCode(), ERROR_CODE_UNSUPPORTED_TOKEN_TYPE.getMessage(),
-                ERROR_CODE_UNSUPPORTED_TOKEN_TYPE.getDescription());
+        assertUserError("The token type is not supported.");
         verify(tokenValidator, never()).validateAndGetUser(anyString(), any(FlowExecutionContext.class), anyLong());
     }
 
@@ -232,12 +229,11 @@ public class UserVerificationExecutorTest {
     public void testInvalidToken() throws Exception {
 
         when(tokenValidator.validateAndGetUser(anyString(), any(FlowExecutionContext.class), anyLong()))
-                .thenThrow(new FlowEngineClientException(ERROR_CODE_INVALID_TOKEN.getCode(),
-                        ERROR_CODE_INVALID_TOKEN.getMessage(), ERROR_CODE_INVALID_TOKEN.getDescription()));
+                .thenThrow(new FlowEngineClientException(ERROR_CODE_FLOW_FAILURE.getCode(),
+                        ERROR_CODE_FLOW_FAILURE.getMessage(), INVALID_TOKEN_MESSAGE));
         addInputs();
 
-        assertUserError(ERROR_CODE_INVALID_TOKEN.getCode(), ERROR_CODE_INVALID_TOKEN.getMessage(),
-                ERROR_CODE_INVALID_TOKEN.getDescription());
+        assertUserError(INVALID_TOKEN_MESSAGE);
     }
 
     @Test
@@ -256,8 +252,7 @@ public class UserVerificationExecutorTest {
         when(accountLockService.isAccountLocked(USER_NAME, TENANT_DOMAIN, USER_STORE_DOMAIN)).thenReturn(true);
         addInputs();
 
-        assertUserError(ERROR_CODE_ACCOUNT_LOCKED.getCode(), ERROR_CODE_ACCOUNT_LOCKED.getMessage(),
-                ERROR_CODE_ACCOUNT_LOCKED.getDescription());
+        assertUserError("The user account is locked.");
         assertNull(context.getFlowUser().getUserId());
     }
 
@@ -268,8 +263,7 @@ public class UserVerificationExecutorTest {
         when(accountDisableService.isAccountDisabled(USER_NAME, TENANT_DOMAIN, USER_STORE_DOMAIN)).thenReturn(true);
         addInputs();
 
-        assertUserError(ERROR_CODE_ACCOUNT_DISABLED.getCode(), ERROR_CODE_ACCOUNT_DISABLED.getMessage(),
-                ERROR_CODE_ACCOUNT_DISABLED.getDescription());
+        assertUserError("The user account is disabled.");
         assertNull(context.getFlowUser().getUserId());
     }
 
@@ -340,13 +334,12 @@ public class UserVerificationExecutorTest {
                 TENANT_DOMAIN)).thenReturn(property);
     }
 
-    private void assertUserError(String errorCode, String errorMessage, String errorDescription) {
+    private void assertUserError(String errorMessage) {
 
         ExecutorResponse response = executor.execute(context);
         assertEquals(response.getResult(), STATUS_USER_ERROR);
-        assertEquals(response.getErrorCode(), errorCode);
+        assertNull(response.getErrorCode());
         assertEquals(response.getErrorMessage(), errorMessage);
-        assertEquals(response.getErrorDescription(), errorDescription);
     }
 
     private NodeConfig buildNode(String tokenValidityPeriod) {
